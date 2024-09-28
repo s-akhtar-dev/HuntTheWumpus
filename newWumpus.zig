@@ -3,6 +3,7 @@
 //FILE: wumpus.zig
 //This file represents the game, Hunt the Wumpus
 
+//TODO: Add Comments
 const std = @import("std");
 const print = std.debug.print;
 var isWumpusGameOver: bool = false;
