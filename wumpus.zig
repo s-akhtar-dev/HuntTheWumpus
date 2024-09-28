@@ -57,6 +57,7 @@ pub fn printMoveOptions() void {
     std.debug.print("{s}\n", .{gameOptions.moveDown});
     std.debug.print("{s}\n", .{gameOptions.moveLeft});
     std.debug.print("{s}\n", .{gameOptions.moveRight});
+    std.debug.print("{s}\n", .{gameOptions.shootArrow});
     std.debug.print("{s}", .{gameOptions.enterChoice});
 }
 
@@ -68,19 +69,26 @@ pub fn printShootOptions() void {
     std.debug.print("{s}", .{gameOptions.enterChoice});
 }
 
-pub fn generateWumpusGame(counter: i32, genType: u8) void {
-    var counterMutating = counter;
-    const random = std.crypto.random;
+pub fn generateWumpusGame() void {
+    const rand = std.crypto.random;
+    var col: usize = 0;
+    var row: usize = 0;
 
-    while (counterMutating > 0) {
-        const row: usize = random.intRangeAtMost(u8, 0, 3);
-        const col: usize = random.intRangeAtMost(u8, 0, 5);
-
-        if (row != 3 and col != 0) {
-            endingWumpusMap[row][col] = genType;
-            counterMutating -= 1;
-        }
+    //place four pits-placing one per row
+    for (0..4) |r| {
+	    col = rand.intRangeAtMost(u8, 1, 5);
+	    endingWumpusMap[r][col] = 'p';
     }
+
+    //place the wumpus
+    col = rand.intRangeAtMost(u8, 1, 5);
+    row = rand.intRangeAtMost(u8, 0, 2);
+    while (endingWumpusMap[row][col] == 'p') {
+        col = rand.intRangeAtMost(u8, 1, 5);
+        row = rand.intRangeAtMost(u8, 0, 2);
+    }
+    endingWumpusMap[row][col] = 'w';
+
     stenchAndBreezeMap = endingWumpusMap;
     generateBreezeAndStench();
 }
@@ -151,6 +159,11 @@ pub fn getPlayerSelection() u8 {
 }
 
 pub fn wumpusGameFromMove(selection: u8) void {
+    if (!checkValidMove(selection)) {
+        print("You bumped into a fuzzy wall!\n", .{});
+        return;
+    }
+
     switch (selection) {
         'u' => {
             movePlayerOnWumpusMap("up");
@@ -181,6 +194,19 @@ pub fn wumpusGameFromMove(selection: u8) void {
             wumpusGameFromMove(userSelection);
         }
     }
+}
+
+pub fn checkValidMove(direction: u8) bool {
+    if (direction == 'u' and userRow == 0) {
+        return false;
+    } else if (direction == 'd' and userRow == 3) {
+        return false;
+    } else if (direction == 'l' and userCol == 0) {
+        return false;
+    } else if (direction == 'r' and userCol == 5) {
+        return false;
+    }
+    return true;
 }
 
 pub fn wumpusGameFromShoot(selection: u8) void {
@@ -280,8 +306,7 @@ pub fn checkPosition(row: usize, col: usize) void {
 pub fn startWumpusGame() void {
     var userSelection: u8 = '0';
     std.debug.print("{s}\n\n", .{gameOptions.intro});
-    generateWumpusGame(1, 'w');
-    generateWumpusGame(4, 'p');
+    generateWumpusGame();
     checkPosition(userRow, userCol);
 
     while (!isGameOver) {

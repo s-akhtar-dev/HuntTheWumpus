@@ -1,1 +1,1 @@
-endingWumpusMap
+.dir
