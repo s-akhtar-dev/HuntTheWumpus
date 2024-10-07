@@ -77,6 +77,41 @@ const gameOptions = struct {
     pub const wall = "You bumped into as wall!";
 };
 
+// === Hunt the Wumpus Main Method ===
+
+/// Starts the game of Hunt the Wumpus
+pub fn main() void {
+    startWumpusGame();
+}
+
+// === Hunt the Wumpus Game Initialization Method ===
+
+/// Method to create and loop through wumpus game
+pub fn startWumpusGame() void {
+    // Prints introduction message and generates random maze
+    print("{s}\n\n", .{gameOptions.intro});
+    generateWumpusGame();
+
+    // Plays Hunt the Wumpus until game is over
+    while (!isWumpusGameOver) {
+        // Displays maze, options, and sets direction
+        printWumpusMaze();
+        printMoveOptions();
+        setPlayerDirection(true);
+        
+        // Ensures the direction is a legal option
+        while (playerDir == .Illegal) {
+            print("{s}\n", .{gameOptions.invalidInput});
+            printMoveOptions();
+            setPlayerDirection(true);
+        }
+
+        // Prints hints and continues game
+        wumpusGameFromMove();
+        print("\n", .{});
+    }
+}
+
 // === Hunt the Wumpus Direction Prompt Methods ===
 
 /// Prints the sequence of messages for moving player
@@ -324,39 +359,4 @@ pub fn wumpusGameFromShoot() void {
     // Ends the game and prints full maze
     isWumpusGameOver = true;
     printGameOverMaze();
-}
-
-// === Hunt the Wumpus Game Initialization Method ===
-
-/// Method to create and loop through wumpus game
-pub fn startWumpusGame() void {
-    // Prints introduction message and generates random maze
-    print("{s}\n\n", .{gameOptions.intro});
-    generateWumpusGame();
-
-    // Plays Hunt the Wumpus until game is over
-    while (!isWumpusGameOver) {
-        // Displays maze, options, and sets direction
-        printWumpusMaze();
-        printMoveOptions();
-        setPlayerDirection(true);
-        
-        // Ensures the direction is a legal option
-        while (playerDir == .Illegal) {
-            print("{s}\n", .{gameOptions.invalidInput});
-            printMoveOptions();
-            setPlayerDirection(true);
-        }
-
-        // Prints hints and continues game
-        wumpusGameFromMove();
-        print("\n", .{});
-    }
-}
-
-// === Hunt the Wumpus Main Method ===
-
-/// Starts the game of Hunt the Wumpus
-pub fn main() void {
-    startWumpusGame();
 }
