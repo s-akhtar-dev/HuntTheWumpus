@@ -1,328 +1,362 @@
-//PROGRAMMER: Sarah Akhtar and Kieran Monks
-//DATE: 9/24/24
-//FILE: wumpus.zig
-//This file represents the game, Hunt the Wumpus
+// PROGRAMMERS: Sarah Akhtar and Kieran Monks
+// DATE: 10/05/2024
+// FILE: wumpus.zig
+// DESCRIPTION: This file implements the Hunt the Wumpus game
+// ----------------------------------------------------------- //
 
+// === Imports and Game State Variables ===
+
+/// Standard library and printing imports
 const std = @import("std");
 const print = std.debug.print;
-var isGameOver: bool = false;
-var isGameWinner: bool = false;
-var userRow: usize = 3;
-var userCol: usize = 0;
 
-var interfaceWumpusMap = [4][6]u8 {
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'X', 'O', 'O', 'O', 'O', 'O'},
+/// Global variables for storing player states including:
+/// - The current row/column position for the player
+/// - The current player proposed direction to move
+/// - The current arrow direction set by player
+var playerRow: usize = 3;
+var playerCol: usize = 0;
+var playerDir: Direction = Direction.Still;
+var playerArrow: Direction = Direction.Still;
+
+/// Global variables for detecting game over and storing wumpus location
+var isWumpusGameOver: bool = false;
+var wumpusLocation: [2]usize = [2]usize{ 0, 0 };
+
+/// Enum for storing direction states as follows:
+/// - Up/Down/Left/Right: valid direction
+/// - Illegal: invalid direction for moving
+/// - Still: current player row/column
+/// - Shoot: player declares an arrow shot
+const Direction = enum { Up, Down, Left, Right, Still, Shoot, Illegal };
+
+/// Hunt the Wumpus Maze for Gameplay
+var wumpusMaze = [4][6]u8{
+    .{ 'O', 'O', 'O', 'O', 'O', 'O' },
+    .{ 'O', 'O', 'O', 'O', 'O', 'O' },
+    .{ 'O', 'O', 'O', 'O', 'O', 'O' },
+    .{ 'O', 'O', 'O', 'O', 'O', 'O' },
 };
 
-var endingWumpusMap = [4][6]u8 {
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-};
+// === Hunt the Wumpus Feedback and Input Messages ===
 
-var stenchAndBreezeMap = [4][6]u8 {
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-    .{'O', 'O', 'O', 'O', 'O', 'O'},
-};
-
+/// Struct for storing accessible game message variants
 const gameOptions = struct {
+    // Introduction and win message
     pub const intro = "Hunt down the wumpus and try to shoot it with your arrow!";
+    pub const win = "You killed the wumpus! You win the game.";
+
+    // Player move direction prompts
     pub const instruct = "What do you want to do:";
     pub const moveUp = " u) move up";
     pub const moveDown = " d) move down";
     pub const moveLeft = " l) move left";
     pub const moveRight = " r) move right";
     pub const shootArrow = " s) shoot arrow";
+
+    // Entering a direction and feedback message
     pub const enterChoice = "ENTER CHOICE: ";
+    pub const invalidInput = "Oops! Try something else...";
+
+    // Wumpus stench and pit breeze message
     pub const wumpusBreeze = "You feel a breeze.";
     pub const wumpusStench = "You smell a stench.";
+
+    // Player shoot direction prompts
     pub const direction = "What direction do you want to shoot your arrow:";
     pub const shootUp = " u) up";
     pub const shootDown = " d) down";
     pub const shootLeft = " l) left";
     pub const shootRight = " r) right";
-    pub const win = "You killed the wumpus! You win the game.";
-    pub const loss = "You fell in the depths of the wumpus tummy. You lost!";
+
+    // Various loss and feedback messages
+    pub const wumpLoss = "You fell in the depths of the wumpus tummy. You lost!";
+    pub const pitsLoss = "You fell into a dark pit where the wumpus children live. You lost!";
+    pub const shotLoss = "You shot in the wrong direction and became the snack for the wumpus. You lost!";
+    pub const dir = "That's not a valid direction! The wumpus advises you to try again.";
+    pub const wall = "You bumped into as wall!";
 };
 
+// === Hunt the Wumpus Direction Prompt Methods ===
+
+/// Prints the sequence of messages for moving player
 pub fn printMoveOptions() void {
-    std.debug.print("{s}\n", .{gameOptions.instruct});
-    std.debug.print("{s}\n", .{gameOptions.moveUp});
-    std.debug.print("{s}\n", .{gameOptions.moveDown});
-    std.debug.print("{s}\n", .{gameOptions.moveLeft});
-    std.debug.print("{s}\n", .{gameOptions.moveRight});
-    std.debug.print("{s}\n", .{gameOptions.shootArrow});
-    std.debug.print("{s}", .{gameOptions.enterChoice});
+    print("{s}\n", .{gameOptions.instruct});
+    print("{s}\n", .{gameOptions.moveUp});
+    print("{s}\n", .{gameOptions.moveDown});
+    print("{s}\n", .{gameOptions.moveLeft});
+    print("{s}\n", .{gameOptions.moveRight});
+    print("{s}\n", .{gameOptions.shootArrow});
+    print("{s}", .{gameOptions.enterChoice});
 }
 
+/// Prints the sequence of messages for shooting arrow
 pub fn printShootOptions() void {
-    std.debug.print("{s}\n", .{gameOptions.shootUp});
-    std.debug.print("{s}\n", .{gameOptions.shootDown});
-    std.debug.print("{s}\n", .{gameOptions.shootLeft});
-    std.debug.print("{s}\n", .{gameOptions.shootRight});
-    std.debug.print("{s}", .{gameOptions.enterChoice});
+    print("{s}\n", .{gameOptions.direction});
+    print("{s}\n", .{gameOptions.shootUp});
+    print("{s}\n", .{gameOptions.shootDown});
+    print("{s}\n", .{gameOptions.shootLeft});
+    print("{s}\n", .{gameOptions.shootRight});
+    print("{s}", .{gameOptions.enterChoice});
 }
 
+// === Hunt the Wumpus Map Generation and Printing Methods ===
+
+/// Generates placement of pits and wumpus for maze
+/// - The pits and wumpus locations exclude the last row and first column
 pub fn generateWumpusGame() void {
+    // Creates random number generator and placeholders
     const rand = std.crypto.random;
-    var col: usize = 0;
-    var row: usize = 0;
+    var gameRow: usize = 0;
+    var gameCol: usize = 0;
 
-    //place four pits-placing one per row
-    for (0..4) |r| {
-	    col = rand.intRangeAtMost(u8, 1, 5);
-	    endingWumpusMap[r][col] = 'p';
+    // Generates four pits in maze from valid boundaries
+    for (0..4) |_| {
+        gameCol = rand.intRangeAtMost(u8, 1, 5);
+        gameRow = rand.intRangeAtMost(u8, 0, 2);
+        wumpusMaze[gameRow][gameCol] = 'p';
     }
 
-    //place the wumpus
-    col = rand.intRangeAtMost(u8, 1, 5);
-    row = rand.intRangeAtMost(u8, 0, 2);
-    while (endingWumpusMap[row][col] == 'p') {
-        col = rand.intRangeAtMost(u8, 1, 5);
-        row = rand.intRangeAtMost(u8, 0, 2);
+    // Generates wumpus in maze, avoiding the placements of pits
+    while (true) {
+        gameCol = rand.intRangeAtMost(u8, 1, 5);
+        gameRow = rand.intRangeAtMost(u8, 0, 2);
+        if (wumpusMaze[gameRow][gameCol] == 'O') {
+            wumpusMaze[gameRow][gameCol] = 'w';
+            wumpusLocation[0] = gameRow;
+            wumpusLocation[1] = gameCol;
+            break;
+        }
     }
-    endingWumpusMap[row][col] = 'w';
-
-    stenchAndBreezeMap = endingWumpusMap;
-    generateBreezeAndStench();
 }
 
-
-pub fn generateBreezeAndStench() void {
-    const height = 4;
-    const width = 6;
-
-    for (0..height) |row| {
-        for (0..width) |col| {
-            if (stenchAndBreezeMap[row][col] == 'w') {
-                addHintsToMap(row, col, 's', height, width);
-            } else if (stenchAndBreezeMap[row][col] == 'p') {
-                addHintsToMap(row, col, 'b', height, width);
+/// Prints the maze with player and with pits and wumpus hidden
+pub fn printWumpusMaze() void {
+    for (0..4) |gameRow| {
+        for (0..6) |gameCol| {
+            if (gameRow == playerRow and gameCol == playerCol) {
+                print("X", .{});
+            } else {
+                print("O", .{});
             }
         }
+        print("\n", .{});
     }
 }
 
-pub fn addHintsToMap(wumpusRow: usize, wumpusCol: usize, genType: u8, height: usize, width: usize) void {
-    var currentRow: usize = 0;
-    var currentCol: usize = 0;
-
-    if (wumpusRow > 0) {
-        currentRow = wumpusRow - 1;
-        placeMarker(currentRow, wumpusCol, genType);
-    }
-    if (wumpusRow + 1 < height) {
-        currentRow = wumpusRow + 1;
-        placeMarker(currentRow, wumpusCol, genType);
-    }
-    if (wumpusCol > 0) {
-        currentCol = wumpusCol - 1;
-        placeMarker(wumpusRow, currentCol, genType);
-    }
-    if (wumpusCol + 1 < width) {
-        currentCol = wumpusCol + 1;
-        placeMarker(wumpusRow, currentCol, genType);
-    }
-}
-
-fn placeMarker(row: usize, col: usize, marker: u8) void {
-    const existingMarker = stenchAndBreezeMap[row][col];
-    if (existingMarker == 'O') {
-        stenchAndBreezeMap[row][col] = marker;
-    } else if ((existingMarker == 's' and marker == 'b') or (existingMarker == 'b' and marker == 's')) {
-        stenchAndBreezeMap[row][col] = 'x';
-    }
-}
-
-pub fn printWumpusMap(wumpusMap: [4][6]u8) void {
+/// Prints the maze with player and with pits and wumpus showing
+pub fn printGameOverMaze() void {
     for (0..4) |wumpusRow| {
         for (0..6) |wumpusCol| {
-            print("{c}", .{wumpusMap[wumpusRow][wumpusCol]});
+            print("{c}", .{wumpusMaze[wumpusRow][wumpusCol]});
         }
-        std.debug.print("\n", .{});
+        print("\n", .{});
     }
 }
 
-pub fn getPlayerSelection() u8 {
+// === Hunt the Wumpus Player Move Validation and Update Methods ===
+
+/// Sets potential player move or arrow direction from input
+/// - Illegal moves will result in a feedback message for retry
+/// - isPlayerMove will determine whether player or arrow is set
+pub fn setPlayerDirection(isPlayerMove: bool) void {
+    // Reads input from player and throws optional error
     const wumpusReader = std.io.getStdIn().reader();
-    var wumpusBuffer: [8]u8 = undefined;
-    if (wumpusReader.readUntilDelimiter(&wumpusBuffer, '\n')) |input| {
-        if (input.len > 0) { return input[0]; }
-    } else |_| {}
-    return '0';
+    var wumpusBuffer: [32]u8 = undefined;
+    const input = wumpusReader.readUntilDelimiter(&wumpusBuffer, '\n') catch |err| {
+        print("Error reading input: {}\n", .{err});
+        playerDir = .Illegal;
+        playerArrow = .Illegal;
+        return;
+    };
+
+    // Determines whether input is illegal and if arrow or move is updated
+    if (input.len > 0 and isPlayerMove) {
+        playerDir = switch (input[0]) {
+            'u' => .Up, 'd' => .Down, 'l' => .Left, 'r' => .Right, 's' => .Shoot,
+            else => .Illegal,
+        };
+    } else if (input.len > 0) {
+        playerArrow = switch (input[0]) {
+            'u' => .Up, 'd' => .Down, 'l' => .Left, 'r' => .Right,
+            else => .Illegal,
+        };
+    }
 }
 
-pub fn wumpusGameFromMove(selection: u8) void {
-    if (!checkValidMove(selection)) {
-        print("You bumped into a fuzzy wall!\n", .{});
+/// Updates maze from move and prints maze feedback
+/// - Checks for valid direction and bounds for moving
+/// - Updates direction from move and detects hints
+pub fn wumpusGameFromMove() void {
+    // Shoots arrow if player selected arrow
+    if (playerDir == .Shoot) {
+        wumpusGameFromShoot();
         return;
     }
 
-    switch (selection) {
-        'u' => {
-            movePlayerOnWumpusMap("up");
-            checkPosition(userCol, userRow);
-        },
-        'd' => {
-            movePlayerOnWumpusMap("down");
-            checkPosition(userCol, userRow);
-        },
-        'l' => {
-            movePlayerOnWumpusMap("left");
-            checkPosition(userCol, userRow);
-        },
-        'r' => {
-            movePlayerOnWumpusMap("right");
-            checkPosition(userCol, userRow);
-        },
-        's' => {
-            std.debug.print("{s}\n\n", .{gameOptions.shootArrow});
-            printShootOptions();
-            const userSelection: u8 = getPlayerSelection();
-            wumpusGameFromShoot(userSelection);
-        },
-        else => {
-            print("Invalid option. Please try again.\n", .{});
-            std.debug.print("{s}\n\n", .{gameOptions.enterChoice});
-            const userSelection: u8 = getPlayerSelection();
-            wumpusGameFromMove(userSelection);
-        }
+    // Checks for illegal direction before update
+    if (!checkValidDirection()) {
+        print("{s}\n", .{gameOptions.dir});
+        return;
     }
+
+    // Checks for illegal bounds before update
+    if (!checkValidMove()) {
+        print("{s}\n", .{gameOptions.wall});
+        return;
+    }
+
+    // Updates player direction from move
+    switch (playerDir) {
+        .Up => playerRow -= 1, .Down => playerRow += 1,
+        .Left => playerCol -= 1, .Right => playerCol += 1,
+        else => {},
+    }
+
+    // Detects potential stench and breeze
+    mazeScentsAndLossDetection();
 }
 
-pub fn checkValidMove(direction: u8) bool {
-    if (direction == 'u' and userRow == 0) {
-        return false;
-    } else if (direction == 'd' and userRow == 3) {
-        return false;
-    } else if (direction == 'l' and userCol == 0) {
-        return false;
-    } else if (direction == 'r' and userCol == 5) {
-        return false;
-    }
-    return true;
+/// Check for valid direction from player input
+pub fn checkValidDirection() bool {
+    return switch (playerDir) {
+        .Up, .Down, .Left, .Right => true,
+        else => false,
+    };
 }
 
-pub fn wumpusGameFromShoot(selection: u8) void {
-    var hit: bool = false;
-    switch (selection) {
-        'u' => {
-            for ((userRow - 1)..0) |row| {
-                if (stenchAndBreezeMap[row][userCol] == 'w') {
-                    hit = true;
-                    break;
-                }
-            }
-        },
-        'd' => {
-            for ((userRow + 1)..3) |row| {
-                if (stenchAndBreezeMap[row][userCol] == 'w') {
-                    hit = true;
-                    break;
-                }
-            }
-        },
-        'l' => {
-            for ((userCol - 1)..0) |col| {
-                if (stenchAndBreezeMap[userRow][col] == 'w') {
-                    hit = true;
-                    break;
-                }
-            }
-        },
-        'r' => {
-            for ((userCol + 1)..5) |col| {
-                if (stenchAndBreezeMap[userRow][col] == 'w') {
-                    hit = true;
-                    break;
-                }
-            }
-        },
-        else => {
-            print("Invalid option. Please try again.\n", .{});
-            return;
-        }
-    }
+/// Check for valid bounds from player input
+pub fn checkValidMove() bool {
+    return switch (playerDir) {
+        .Up => playerRow > 0, .Down => playerRow < 3,
+        .Left => playerCol > 0, .Right => playerCol < 5,
+        else => false,
+    };
+}
 
-    if (hit) {
-        isGameWinner = true;
-        isGameOver = true;
-        print("{s}\n", .{gameOptions.win});
+// === Hunt the Wumpus Player Loss Detection and Hint Methods ===
+
+/// Determines a player loss or hints from move
+pub fn mazeScentsAndLossDetection() void {
+    // Creates a valid directions array for hint detection
+    var validDirections = std.ArrayList(Direction).init(std.heap.page_allocator);
+    defer validDirections.deinit();
+
+    // Ensures that player position is valid for moving
+    if (playerRow > 0) validDirections.append(.Up) catch unreachable;
+    if (playerRow < 3) validDirections.append(.Down) catch unreachable;
+    if (playerCol > 0) validDirections.append(.Left) catch unreachable;
+    if (playerCol < 5) validDirections.append(.Right) catch unreachable;
+
+    // Determines a loss from wumpus or pit, otherwise prints hints
+    if (wumpusMaze[playerRow][playerCol] == 'w') {
+        print("{s}\n\n", .{gameOptions.wumpLoss});
+        isWumpusGameOver = true;
+        printGameOverMaze();
+    } else if (wumpusMaze[playerRow][playerCol] == 'p') {
+        print("{s}\n\n", .{gameOptions.pitsLoss});
+        isWumpusGameOver = true;
+        printGameOverMaze();
     } else {
-        print("You missed the Wumpus!\n", .{});
+        printWumpusStenchandBreeze(validDirections.items);
     }
 }
 
-pub fn movePlayerOnWumpusMap(moveType: []const u8) void {
-    if (std.mem.eql(u8, moveType, "up")) {
-        if (userRow > 0) {
-            userRow -= 1;
-        }
-    } else if (std.mem.eql(u8, moveType, "down")) {
-        if (userRow < 3) {
-            userRow += 1;
-        }
-    } else if (std.mem.eql(u8, moveType, "left")) {
-        if (userCol > 0) {
-            userCol -= 1;
-        }
-    } else if (std.mem.eql(u8, moveType, "right")) {
-        if (userCol < 5) {
-            userCol += 1;
-        }
-    } else {
-        std.debug.print("You bumped into a wall.", .{});
-    }
-    updatePlayerPosition();
-}
+/// Prints hints from pit and wumpus locations
+pub fn printWumpusStenchandBreeze(directions: []const Direction) void {
+    // Stores state for one hint per obstacle
+    var isStench: bool = false;
+    var isBreeze: bool = false;
 
-fn updatePlayerPosition() void {
-    interfaceWumpusMap = endingWumpusMap; // Reset map to base
-    interfaceWumpusMap[userRow][userCol] = 'X'; // Mark the player position
-}
+    // Checks all directions to ensure hints are detected
+    for (directions) |direction| {
+        var checkRow = playerRow;
+        var checkCol = playerCol;
 
-pub fn shootWumpusOnMap() void {
+        // Updates direction for hint checking
+        switch (direction) {
+            .Up => checkRow -= 1,
+            .Down => checkRow += 1,
+            .Left => checkCol -= 1,
+            .Right => checkCol += 1,
+            else => {},
+        }
 
-}
-
-pub fn checkPosition(row: usize, col: usize) void {
-    const elementCharacter = stenchAndBreezeMap[row][col];
-    if (elementCharacter == 's') {
-        std.debug.print("{s}\n\n", .{gameOptions.wumpusStench});
-    } else if (elementCharacter == 'b') {
-        std.debug.print("{s}\n\n", .{gameOptions.wumpusBreeze});
-    } else if (elementCharacter == 'x') {
-        std.debug.print("{s}\n\n", .{gameOptions.wumpusStench});
-        std.debug.print("{s}\n\n", .{gameOptions.wumpusBreeze});
+        // Prints hints based on wumpus or pit detection
+        if (wumpusMaze[checkRow][checkCol] == 'w' and !isStench) {
+            print("{s}\n", .{gameOptions.wumpusStench});
+            isStench = true;
+        } else if (wumpusMaze[checkRow][checkCol] == 'p' and !isBreeze) {
+            print("{s}\n", .{gameOptions.wumpusBreeze});
+            isBreeze = true;
+        }
     }
 }
 
+// === Hunt the Wumpus Arrow Shooting Method ===
+
+/// Concludes the game from player arrow shot
+pub fn wumpusGameFromShoot() void {
+    // Prints game prompts and sets direction
+    printShootOptions();
+    setPlayerDirection(false);
+
+    // Ensures that player arrow direction is legal
+    while (playerArrow == .Illegal) {
+        print("{s}\n", .{gameOptions.dir});
+        printShootOptions();
+        setPlayerDirection(false);
+    }
+
+    // Determines if the arrow shot direction hits the wumpus
+    const isWumpusShot = switch (playerArrow) {
+        .Up => playerRow > 0 and playerRow - 1 == wumpusLocation[0] and playerCol == wumpusLocation[1],
+        .Down => playerRow < 3 and playerRow + 1 == wumpusLocation[0] and playerCol == wumpusLocation[1],
+        .Left => playerCol > 0 and playerCol - 1 == wumpusLocation[1] and playerRow == wumpusLocation[0],
+        .Right => playerCol < 5 and playerCol + 1 == wumpusLocation[1] and playerRow == wumpusLocation[0],
+        else => false,
+    };
+
+    // Prints message based on success of arrow shot
+    if (isWumpusShot) { print("{s}\n", .{gameOptions.win});
+    } else { print("{s}\n", .{gameOptions.shotLoss}); }
+
+    // Ends the game and prints full maze
+    isWumpusGameOver = true;
+    printGameOverMaze();
+}
+
+// === Hunt the Wumpus Game Initialization Method ===
+
+/// Method to create and loop through wumpus game
 pub fn startWumpusGame() void {
-    var userSelection: u8 = '0';
-    std.debug.print("{s}\n\n", .{gameOptions.intro});
+    // Prints introduction message and generates random maze
+    print("{s}\n\n", .{gameOptions.intro});
     generateWumpusGame();
-    checkPosition(userRow, userCol);
 
-    while (!isGameOver) {
-        printWumpusMap(interfaceWumpusMap);
-        std.debug.print("\n", .{});
-        printWumpusMap(stenchAndBreezeMap);
+    // Plays Hunt the Wumpus until game is over
+    while (!isWumpusGameOver) {
+        // Displays maze, options, and sets direction
+        printWumpusMaze();
         printMoveOptions();
-        userSelection = getPlayerSelection();
-        wumpusGameFromMove(userSelection);
-    }
+        setPlayerDirection(true);
+        
+        // Ensures the direction is a legal option
+        while (playerDir == .Illegal) {
+            print("{s}\n", .{gameOptions.invalidInput});
+            printMoveOptions();
+            setPlayerDirection(true);
+        }
 
-    const ending = if (isGameWinner) .{gameOptions.win} else .{gameOptions.loss};
-    std.debug.print("{s}\n\n", ending);
-    printWumpusMap(endingWumpusMap);
+        // Prints hints and continues game
+        wumpusGameFromMove();
+        print("\n", .{});
+    }
 }
 
-pub fn main() !void {
+// === Hunt the Wumpus Main Method ===
+
+// Starts the game of Hunt the Wumpus
+pub fn main() void {
     startWumpusGame();
 }
