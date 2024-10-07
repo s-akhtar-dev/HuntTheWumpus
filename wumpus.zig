@@ -356,7 +356,7 @@ pub fn startWumpusGame() void {
 
 // === Hunt the Wumpus Main Method ===
 
-// Starts the game of Hunt the Wumpus
+/// Starts the game of Hunt the Wumpus
 pub fn main() void {
     startWumpusGame();
 }
